@@ -8,13 +8,14 @@ Voice channel for coding agents. Two distribution paths:
 ## Claude Code
 
 ```bash
-# Inside Claude Code
+# Inside Claude Code — one-time setup
 /plugin marketplace add utterodev/uttero-plugins
 /plugin install uttero@uttero-plugins
-/uttero:configure
+/uttero:configure    # sign in via Google OAuth
+/uttero:setup        # install MCP server (project or global)
 
-# Start with voice channel
-claude --channels plugin:uttero@uttero-plugins
+# Start with voice channel (every session)
+claude --dangerously-load-development-channels server:uttero
 ```
 
 ## Cursor / Windsurf
