@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "uttero": {
-      "command": "bun",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/bridge.ts"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/bridge.js"]
     }
   }
 }
