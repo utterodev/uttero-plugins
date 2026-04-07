@@ -1,0 +1,17 @@
+{
+  "name": "uttero-plugins",
+  "owner": {
+    "name": "Uttero",
+    "email": "hello@uttero.dev"
+  },
+  "metadata": {
+    "description": "Voice channel for coding agents"
+  },
+  "plugins": [
+    {
+      "name": "uttero",
+      "source": "./plugin",
+      "description": "Voice channel for Claude Code — receive and make calls while coding"
+    }
+  ]
+}
