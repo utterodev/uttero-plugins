@@ -9,8 +9,8 @@ import { getCredentials } from "./lib/credentials.ts";
 
 // Read credentials: prefer env vars (CLI path), fall back to stored credentials (plugin path)
 const cred = getCredentials();
-const API_BASE = process.env.OTTRVOICE_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
-const AUTH_TOKEN = process.env.OTTRVOICE_AUTH_TOKEN ?? cred?.token;
+const API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
+const AUTH_TOKEN = process.env.UTTERO_AUTH_TOKEN ?? cred?.token;
 
 if (!AUTH_TOKEN) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");

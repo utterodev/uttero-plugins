@@ -10,8 +10,8 @@ export const bridgeCommand = new Command('bridge')
       process.exit(1);
     }
 
-    process.env.OTTRVOICE_API_URL = cred.server_url;
-    process.env.OTTRVOICE_AUTH_TOKEN = cred.token;
+    process.env.UTTERO_API_URL = cred.server_url;
+    process.env.UTTERO_AUTH_TOKEN = cred.token;
 
     console.error(`[uttero] Authenticated as ${cred.email}`);
     console.error(`[uttero] Server: ${cred.server_url}`);
