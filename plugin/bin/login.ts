@@ -61,9 +61,10 @@ export async function browserOAuthFlow(serverUrl: string): Promise<OAuthResult> 
       const callbackUrl = `http://localhost:${port}/callback`;
       const appUrl = serverUrl.replace('api.', 'app.');
       const authUrl = `${appUrl}/auth/cli?redirect=${encodeURIComponent(callbackUrl)}&api=${encodeURIComponent(serverUrl)}`;
-      console.log('Opening browser for sign-in...');
+      console.log(`Sign-in URL: ${authUrl}`);
+      console.log('Opening browser...');
       open(authUrl).catch(() => {
-        console.log(`Open this URL manually: ${authUrl}`);
+        console.log('Could not open browser automatically. Open the URL above manually.');
       });
     });
 
