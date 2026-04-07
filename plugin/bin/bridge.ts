@@ -10,6 +10,7 @@ import { getCredentials } from "./lib/credentials.ts";
 // Read credentials: prefer env vars (CLI path), fall back to stored credentials (plugin path)
 const cred = getCredentials();
 const API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
+const APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 const AUTH_TOKEN = process.env.UTTERO_AUTH_TOKEN ?? cred?.token;
 
 if (!AUTH_TOKEN) {
@@ -184,7 +185,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       const parsed = JSON.parse(data);
       if (parsed.call_id) {
         connectCallSSE(parsed.call_id);
-        parsed.url = `${API_BASE}/call/${parsed.call_id}`;
+        parsed.url = `${APP_BASE}/call/${parsed.call_id}`;
         return { content: [{ type: "text", text: JSON.stringify(parsed) }] };
       }
     } catch {}
@@ -326,4 +327,4 @@ async function connectCallSSE(callId: string) {
 // --- Start ---
 
 await mcp.connect(new StdioServerTransport());
-console.error(`OttrVoice ready. Server: ${API_BASE} | Voice URL: ${API_BASE}/call/`);
+console.error(`Uttero ready. API: ${API_BASE} | Calls: ${APP_BASE}/call/`);
