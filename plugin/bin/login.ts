@@ -61,10 +61,10 @@ export async function browserOAuthFlow(serverUrl: string): Promise<OAuthResult> 
       const callbackUrl = `http://localhost:${port}/callback`;
       const appUrl = serverUrl.replace('api.', 'app.');
       const authUrl = `${appUrl}/auth/cli?redirect=${encodeURIComponent(callbackUrl)}&api=${encodeURIComponent(serverUrl)}`;
-      console.log(`Sign-in URL: ${authUrl}`);
-      console.log('Opening browser...');
+      console.error(`Sign-in URL: ${authUrl}`);
+      console.error('Opening browser...');
       open(authUrl).catch(() => {
-        console.log('Could not open browser automatically. Open the URL above manually.');
+        console.error('Could not open browser automatically. Open the URL above manually.');
       });
     });
 
@@ -108,8 +108,8 @@ if (import.meta.main) {
         expires_at: expiresAt,
         server_url: serverUrl,
       });
-      console.log(`✓ Logged in as ${payload.email}`);
-      console.log(`  Token expires: ${new Date(expiresAt).toLocaleDateString()}`);
+      console.error(`✓ Logged in as ${payload.email}`);
+      console.error(`  Token expires: ${new Date(expiresAt).toLocaleDateString()}`);
     } catch {
       console.error('✗ Invalid token format');
       process.exit(1);
@@ -125,8 +125,8 @@ if (import.meta.main) {
         expires_at: result.expires_at,
         server_url: serverUrl,
       });
-      console.log(`✓ Logged in as ${result.email}`);
-      console.log(`  Token expires: ${new Date(result.expires_at).toLocaleDateString()}`);
+      console.error(`✓ Logged in as ${result.email}`);
+      console.error(`  Token expires: ${new Date(result.expires_at).toLocaleDateString()}`);
       process.exit(0);
     } catch (err: any) {
       console.error(`✗ Login failed: ${err.message}`);
