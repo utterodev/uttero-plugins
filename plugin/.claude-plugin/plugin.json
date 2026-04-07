@@ -1,7 +1,7 @@
 {
   "name": "uttero",
   "description": "Voice channel for Claude Code — receive and make calls while coding",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": { "name": "Uttero" },
   "homepage": "https://uttero.dev",
   "repository": "https://github.com/utterodev/uttero-plugins",
@@ -9,8 +9,8 @@
   "keywords": ["voice", "channel", "calls", "audio", "mcp"],
   "mcpServers": {
     "uttero": {
-      "command": "bun",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/bridge.ts"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/bridge.js"]
     }
   }
 }
