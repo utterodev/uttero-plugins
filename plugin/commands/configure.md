@@ -15,7 +15,9 @@ If it succeeds, tell the user they can now start Claude Code with voice:
 claude --channels plugin:uttero@uttero-plugins
 ```
 
-If the browser fails to open, re-run with `--manual` flag:
+If the browser fails to open, ask the user for their token and pass it as an argument:
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/bin/login.ts --manual
+bun ${CLAUDE_PLUGIN_ROOT}/bin/login.ts --token=<the_token_they_give_you>
 ```
+
+Do NOT use `--manual` flag from Claude Code — it requires interactive stdin which is not available.

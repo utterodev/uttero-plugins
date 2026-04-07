@@ -79,17 +79,22 @@ export async function browserOAuthFlow(serverUrl: string): Promise<OAuthResult> 
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const serverUrl = args.find(a => a.startsWith('--server='))?.split('=')[1] ?? DEFAULT_SERVER;
+  const tokenArg = args.find(a => a.startsWith('--token='))?.split('=').slice(1).join('=');
   const manual = args.includes('--manual');
 
-  if (manual) {
-    const readline = await import('readline');
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const token = await new Promise<string>((resolve) => {
-      rl.question('Paste your token: ', (answer) => {
-        rl.close();
-        resolve(answer.trim());
+  if (tokenArg || manual) {
+    let token = tokenArg;
+    if (!token) {
+      // Interactive stdin fallback (works in terminal, not in Claude Code)
+      const readline = await import('readline');
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      token = await new Promise<string>((resolve) => {
+        rl.question('Paste your token: ', (answer) => {
+          rl.close();
+          resolve(answer.trim());
+        });
       });
-    });
+    }
 
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
