@@ -6,5 +6,11 @@
   "homepage": "https://uttero.dev",
   "repository": "https://github.com/utterodev/uttero-plugins",
   "license": "MIT",
-  "keywords": ["voice", "channel", "calls", "audio", "mcp"]
+  "keywords": ["voice", "channel", "calls", "audio", "mcp"],
+  "mcpServers": {
+    "uttero": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/bridge.ts"]
+    }
+  }
 }
