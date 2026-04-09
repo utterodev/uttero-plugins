@@ -14464,6 +14464,10 @@ var ServerResultSchema2 = union([
   CreateTaskResultSchema2
 ]);
 
+// bin/bridge.ts
+import { hostname } from "os";
+import { basename } from "path";
+
 // bin/lib/credentials.ts
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, chmodSync } from "fs";
 import { join } from "path";
@@ -14490,6 +14494,7 @@ var cred = getCredentials();
 var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 var AUTH_TOKEN = process.env.UTTERO_AUTH_TOKEN ?? cred?.token;
+var AGENT_ID = "";
 if (!AUTH_TOKEN) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
@@ -14760,5 +14765,101 @@ async function connectCallSSE(callId) {
     }
   }
 }
+async function registerAgent() {
+  const name = basename(process.cwd());
+  const desc = `Claude Code \u2014 ${name}`;
+  const host = hostname();
+  const res = await fetch(`${API_BASE}/api/agents/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${AUTH_TOKEN}`
+    },
+    body: JSON.stringify({ name, description: desc, hostname: host })
+  });
+  if (res.status === 402) {
+    const err = await res.json();
+    console.error(`[uttero] ${err.message}`);
+    process.exit(1);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Agent registration failed: ${res.status} ${text}`);
+  }
+  const data = await res.json();
+  console.error(`[uttero] Agent registered: ${name} (${data.agent_id})`);
+  return data.agent_id;
+}
+function startHeartbeat(agentId) {
+  setInterval(async () => {
+    try {
+      await fetch(`${API_BASE}/api/agents/${agentId}/heartbeat`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${AUTH_TOKEN}` }
+      });
+    } catch (err) {
+      console.error(`[uttero] Heartbeat failed: ${err.message}`);
+    }
+  }, 30000);
+}
+async function connectAgentStream(agentId) {
+  while (true) {
+    try {
+      const res = await fetch(`${API_BASE}/api/stream/agent/${agentId}?token=${AUTH_TOKEN}`);
+      if (!res.ok || !res.body) {
+        throw new Error(`Agent stream failed: ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder;
+      let buffer = "";
+      let currentEvent = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done)
+          break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(`
+`);
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) {
+            currentEvent = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            const data = line.slice(5).trim();
+            if (!data)
+              continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (currentEvent === "incoming_call") {
+                console.error(`[uttero] Incoming call from user: ${parsed.call_id}`);
+                connectCallSSE(parsed.call_id);
+                await mcp.notification({
+                  method: "notifications/claude/channel",
+                  params: {
+                    content: `incoming_call: call_id=${parsed.call_id}`,
+                    meta: { event: "incoming_call", call_id: parsed.call_id, user_id: parsed.user_id }
+                  }
+                });
+              } else if (currentEvent === "call_ended") {
+                console.error(`[uttero] Call ended: ${parsed.call_id}`);
+              }
+            } catch {}
+            currentEvent = "";
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[uttero] Agent stream error: ${err.message}`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+}
 await mcp.connect(new StdioServerTransport);
-console.error(`Uttero ready. API: ${API_BASE} | Calls: ${APP_BASE}/call/`);
+try {
+  AGENT_ID = await registerAgent();
+  startHeartbeat(AGENT_ID);
+  connectAgentStream(AGENT_ID);
+} catch (err) {
+  console.error(`[uttero] Failed to register agent: ${err.message}`);
+}
+console.error(`Uttero ready. API: ${API_BASE} | Agent: ${AGENT_ID}`);
