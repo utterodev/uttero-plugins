@@ -14499,7 +14499,7 @@ if (!AUTH_TOKEN) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
 }
-var mcp = new Server({ name: "uttero", version: "0.2.0" }, {
+var mcp = new Server({ name: "uttero", version: "0.3.0" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
     tools: {}
