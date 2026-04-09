@@ -14495,10 +14495,12 @@ var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.ut
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 var AUTH_TOKEN = process.env.UTTERO_AUTH_TOKEN ?? cred?.token;
 var AGENT_ID = "";
+var BRIDGE_VERSION = "0.4.0";
 if (!AUTH_TOKEN) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
 }
+console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
 var mcp = new Server({ name: "uttero", version: "0.4.0" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
@@ -14642,6 +14644,7 @@ mcp.setRequestHandler(CallToolRequestSchema2, async (req) => {
     if (route.method === "POST")
       headers["Content-Type"] = "application/json";
     headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
+    headers["X-Bridge-Version"] = BRIDGE_VERSION;
     const res = await fetch(`${API_BASE}${route.path}`, {
       method: route.method,
       headers,
