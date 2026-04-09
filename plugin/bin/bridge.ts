@@ -22,7 +22,7 @@ if (!AUTH_TOKEN) {
 }
 
 const mcp = new Server(
-  { name: "uttero", version: "0.1.0" },
+  { name: "uttero", version: "0.2.0" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },
