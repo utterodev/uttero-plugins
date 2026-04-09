@@ -22,7 +22,7 @@ if (!AUTH_TOKEN) {
 }
 
 const mcp = new Server(
-  { name: "uttero", version: "0.3.0" },
+  { name: "uttero", version: "0.4.0" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },
@@ -175,7 +175,9 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     const res = await fetch(`${API_BASE}${route.path}`, {
       method: route.method,
       headers,
-      body: route.method === "POST" ? JSON.stringify(args) : undefined,
+      body: route.method === "POST" ? JSON.stringify(
+        name === "call_user" && AGENT_ID ? { ...args, agent_id: AGENT_ID } : args
+      ) : undefined,
     });
     data = await res.text();
   } catch (err: any) {

@@ -14499,7 +14499,7 @@ if (!AUTH_TOKEN) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
 }
-var mcp = new Server({ name: "uttero", version: "0.3.0" }, {
+var mcp = new Server({ name: "uttero", version: "0.4.0" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
     tools: {}
@@ -14645,7 +14645,7 @@ mcp.setRequestHandler(CallToolRequestSchema2, async (req) => {
     const res = await fetch(`${API_BASE}${route.path}`, {
       method: route.method,
       headers,
-      body: route.method === "POST" ? JSON.stringify(args) : undefined
+      body: route.method === "POST" ? JSON.stringify(name === "call_user" && AGENT_ID ? { ...args, agent_id: AGENT_ID } : args) : undefined
     });
     data = await res.text();
   } catch (err) {
