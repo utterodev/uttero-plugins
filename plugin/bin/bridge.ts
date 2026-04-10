@@ -379,8 +379,13 @@ function startHeartbeat(agentId: string) {
   }, 30000);
 }
 
+// Set to true when another bridge session has taken over this agent.
+// Once superseded, we stop reconnecting so we don't ping-pong with the
+// newer session. The MCP server keeps running so outbound tools still work.
+let SUPERSEDED = false;
+
 async function connectAgentStream(agentId: string) {
-  while (true) {
+  while (!SUPERSEDED) {
     try {
       const res = await fetch(`${API_BASE}/api/stream/agent/${agentId}?token=${AUTH_TOKEN}`);
       if (!res.ok || !res.body) {
@@ -423,6 +428,14 @@ async function connectAgentStream(agentId: string) {
                 } as any);
               } else if (currentEvent === "call_ended") {
                 console.error(`[uttero] Call ended: ${parsed.call_id}`);
+              } else if (currentEvent === "superseded") {
+                console.error(
+                  `[uttero] This session was superseded by a newer Claude session in the same project. ` +
+                  `Voice bridge stopped. Outbound MCP tools (call_user, list_calls, reply, end_call) still work.`
+                );
+                SUPERSEDED = true;
+                try { reader.cancel(); } catch {}
+                return;
               }
             } catch {}
             currentEvent = "";
@@ -430,6 +443,7 @@ async function connectAgentStream(agentId: string) {
         }
       }
     } catch (err: any) {
+      if (SUPERSEDED) return;
       console.error(`[uttero] Agent stream error: ${err.message}`);
       await new Promise((r) => setTimeout(r, 2000));
     }
