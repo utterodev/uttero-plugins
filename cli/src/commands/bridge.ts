@@ -10,8 +10,9 @@ export const bridgeCommand = new Command('bridge')
       process.exit(1);
     }
 
+    // The plugin bridge re-reads credentials.json on every request via
+    // lib/auth.ts — we no longer hand a token through env vars.
     process.env.UTTERO_API_URL = cred.server_url;
-    process.env.UTTERO_AUTH_TOKEN = cred.token;
 
     console.error(`[uttero] Authenticated as ${cred.email}`);
     console.error(`[uttero] Server: ${cred.server_url}`);

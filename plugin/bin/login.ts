@@ -42,7 +42,7 @@ function parseArgs(argv: string[]): { code?: string; server?: string; deviceName
   return args;
 }
 
-function normalizeCode(raw: string): string | null {
+export function normalizeCode(raw: string): string | null {
   const stripped = raw.replace(/[-\s]/g, '').toUpperCase();
   if (stripped.length !== 8) return null;
   return stripped;
@@ -60,7 +60,7 @@ async function promptCode(): Promise<string> {
   }
 }
 
-async function exchangePairCode(
+export async function exchangePairCode(
   serverUrl: string,
   code: string,
   deviceName: string,
@@ -119,4 +119,8 @@ async function main() {
   }
 }
 
-main();
+// Only run main() when invoked directly, not when imported by the cli/
+// wrapper (which reuses `exchangePairCode` / `normalizeCode`).
+if (import.meta.main) {
+  await main();
+}
