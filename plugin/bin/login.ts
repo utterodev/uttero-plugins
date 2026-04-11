@@ -1,136 +1,122 @@
 #!/usr/bin/env bun
-import { createServer } from 'http';
-import { saveCredentials } from './lib/credentials.ts';
+/**
+ * Pair-code login for Uttero.
+ *
+ * Two modes:
+ *
+ *   1. Non-interactive: `login.ts --code=XXXX-XXXX [--server=...] [--device-name=...]`
+ *      Used by the /uttero:configure skill — Claude Code collects the
+ *      code from the user and passes it down here.
+ *
+ *   2. Interactive: `login.ts` with no `--code` flag
+ *      Readline prompts the user for the code. Used for `npx uttero login`
+ *      on a terminal.
+ *
+ * The flow posts the code to `/api/pair/exchange`, stores the returned
+ * access_token + refresh_token + device_id in ~/.uttero/credentials.json
+ * (mode 600), and prints a short success message.
+ */
+
+import { createInterface } from 'readline/promises';
+import { hostname } from 'os';
+import { stdin as input, stdout as output } from 'process';
+import { saveCredentials, type StoredCredential } from './lib/credentials.ts';
 
 const DEFAULT_SERVER = 'https://api.uttero.dev';
 
-interface OAuthResult {
-  token: string;
-  email: string;
-  user_id: string;
-  expires_at: string;
+interface ExchangeResponse {
+  access_token: string;
+  refresh_token: string;
+  device_id: string;
+  access_expires_in: number;
+  user: { id: string; email: string; name: string };
 }
 
-export async function browserOAuthFlow(serverUrl: string): Promise<OAuthResult> {
-  const open = await import('open').then(m => m.default);
-  return new Promise((resolve, reject) => {
-    const server = createServer(async (req, res) => {
-      const url = new URL(req.url!, `http://localhost`);
-      if (url.pathname === '/callback') {
-        let token: string | null = null;
-        let email: string | null = null;
-        let user_id: string | null = null;
-        let expires_at: string | null = null;
-
-        if (req.method === 'POST') {
-          const body = await new Promise<string>((r) => {
-            let data = '';
-            req.on('data', (chunk) => (data += chunk));
-            req.on('end', () => r(data));
-          });
-          const params = new URLSearchParams(body);
-          token = params.get('token');
-          email = params.get('email');
-          user_id = params.get('user_id');
-          expires_at = params.get('expires_at');
-        } else {
-          token = url.searchParams.get('token');
-          email = url.searchParams.get('email');
-          user_id = url.searchParams.get('user_id');
-          expires_at = url.searchParams.get('expires_at');
-        }
-
-        if (token && email && user_id && expires_at) {
-          const appUrl = serverUrl.replace('api.', 'app.');
-          const successParams = new URLSearchParams({ sid: user_id, email });
-          res.writeHead(302, { 'Location': `${appUrl}/auth/success?${successParams}` });
-          res.end();
-          server.close();
-          resolve({ token, email, user_id, expires_at });
-        } else {
-          res.writeHead(400, { 'Content-Type': 'text/html' });
-          res.end('<html><body><h1>Login failed</h1><p>Missing parameters.</p></body></html>');
-          server.close();
-          reject(new Error('Missing auth parameters'));
-        }
-      }
-    });
-
-    server.listen(0, () => {
-      const port = (server.address() as any).port;
-      const callbackUrl = `http://localhost:${port}/callback`;
-      const appUrl = serverUrl.replace('api.', 'app.');
-      const authUrl = `${appUrl}/auth/cli?redirect=${encodeURIComponent(callbackUrl)}&api=${encodeURIComponent(serverUrl)}`;
-      console.error(`Sign-in URL: ${authUrl}`);
-      console.error('Opening browser...');
-      open(authUrl).catch(() => {
-        console.error('Could not open browser automatically. Open the URL above manually.');
-      });
-    });
-
-    setTimeout(() => {
-      server.close();
-      reject(new Error('Login timed out'));
-    }, 120000);
-  });
+function parseArgs(argv: string[]): { code?: string; server?: string; deviceName?: string } {
+  const args: { code?: string; server?: string; deviceName?: string } = {};
+  for (const arg of argv) {
+    if (arg.startsWith('--code=')) args.code = arg.slice('--code='.length);
+    else if (arg.startsWith('--server=')) args.server = arg.slice('--server='.length);
+    else if (arg.startsWith('--device-name=')) args.deviceName = arg.slice('--device-name='.length);
+  }
+  return args;
 }
 
-// --- Main (only when run directly) ---
+function normalizeCode(raw: string): string | null {
+  const stripped = raw.replace(/[-\s]/g, '').toUpperCase();
+  if (stripped.length !== 8) return null;
+  return stripped;
+}
 
-if (import.meta.main) {
-  const args = process.argv.slice(2);
-  const serverUrl = args.find(a => a.startsWith('--server='))?.split('=')[1] ?? DEFAULT_SERVER;
-  const tokenArg = args.find(a => a.startsWith('--token='))?.split('=').slice(1).join('=');
-  const manual = args.includes('--manual');
-
-  if (tokenArg || manual) {
-    let token = tokenArg;
-    if (!token) {
-      // Interactive stdin fallback (works in terminal, not in Claude Code)
-      const readline = await import('readline');
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      token = await new Promise<string>((resolve) => {
-        rl.question('Paste your token: ', (answer) => {
-          rl.close();
-          resolve(answer.trim());
-        });
-      });
-    }
-
-    try {
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-      const expiresAt = new Date(payload.exp * 1000).toISOString();
-      saveCredentials({
-        token,
-        email: payload.email,
-        user_id: payload.sub,
-        issued_at: new Date(payload.iat * 1000).toISOString(),
-        expires_at: expiresAt,
-        server_url: serverUrl,
-      });
-      console.error(`✓ Logged in as ${payload.email}`);
-      console.error(`  Token expires: ${new Date(expiresAt).toLocaleDateString()}`);
-    } catch {
-      console.error('✗ Invalid token format');
-      process.exit(1);
-    }
-  } else {
-    try {
-      const result = await browserOAuthFlow(serverUrl);
-      saveCredentials({
-        token: result.token,
-        email: result.email,
-        user_id: result.user_id,
-        issued_at: new Date().toISOString(),
-        expires_at: result.expires_at,
-        server_url: serverUrl,
-      });
-      console.error(`✓ Logged in as ${result.email}`);
-      console.error(`  Token expires: ${new Date(result.expires_at).toLocaleDateString()}`);
-      process.exit(0);
-    } catch (err: any) {
-      console.error(`✗ Login failed: ${err.message}`);
-      process.exit(1);
-    }
+async function promptCode(): Promise<string> {
+  const rl = createInterface({ input, output });
+  try {
+    const answer = await rl.question(
+      'Paste your Uttero pair code (from https://app.uttero.dev/settings/devices): ',
+    );
+    return answer.trim();
+  } finally {
+    rl.close();
   }
 }
+
+async function exchangePairCode(
+  serverUrl: string,
+  code: string,
+  deviceName: string,
+): Promise<ExchangeResponse> {
+  const res = await fetch(`${serverUrl}/api/pair/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, device_name: deviceName }),
+  });
+  if (res.status === 404) {
+    throw new Error('Pair code not found or expired. Generate a new one on app.uttero.dev.');
+  }
+  if (res.status === 429) {
+    throw new Error('Too many pair attempts. Wait a minute and try again.');
+  }
+  if (!res.ok) {
+    throw new Error(`Exchange failed: HTTP ${res.status}`);
+  }
+  return (await res.json()) as ExchangeResponse;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const serverUrl = args.server || process.env.UTTERO_SERVER_URL || DEFAULT_SERVER;
+  const deviceName = args.deviceName || `${hostname()}-claude-code`;
+
+  const rawCode = args.code ?? (await promptCode());
+  const normalized = normalizeCode(rawCode);
+  if (!normalized) {
+    console.error('[uttero] Pair code must be 8 characters (hyphens optional).');
+    process.exit(2);
+  }
+
+  try {
+    const result = await exchangePairCode(serverUrl, normalized, deviceName);
+    const expiresAt = new Date(Date.now() + result.access_expires_in * 1000).toISOString();
+    const cred: StoredCredential = {
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
+      access_expires_at: expiresAt,
+      device_id: result.device_id,
+      email: result.user.email,
+      user_id: result.user.id,
+      server_url: serverUrl,
+    };
+    saveCredentials(cred);
+
+    console.log(`\n✓ Paired as ${result.user.email}`);
+    console.log(`  Device: ${deviceName}`);
+    console.log(`  ID:     ${result.device_id}`);
+    console.log(`\nCredentials stored at ~/.uttero/credentials.json (mode 600)`);
+    console.log('You can revoke this device any time at https://app.uttero.dev/settings/devices');
+  } catch (e) {
+    console.error(`[uttero] ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
+}
+
+main();

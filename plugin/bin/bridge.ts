@@ -8,18 +8,30 @@ import {
 import { hostname } from "os";
 import { basename } from "path";
 import { getCredentials } from "./lib/credentials.ts";
+import { getAccessToken } from "./lib/auth.ts";
 
-// Read credentials: prefer env vars (CLI path), fall back to stored credentials (plugin path)
+// Read credentials once at startup ONLY to pick up server_url + fail fast if
+// the file is missing. Every authenticated fetch below calls getAccessToken()
+// which re-reads the file and refreshes on-demand — this is how multiple
+// bridge processes can share a single rotating refresh token without
+// stomping on each other.
 const cred = getCredentials();
 const API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 const APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
-const AUTH_TOKEN = process.env.UTTERO_AUTH_TOKEN ?? cred?.token;
 let AGENT_ID = ""; // Set after registration
 
-const BRIDGE_VERSION = "0.4.0";
+const BRIDGE_VERSION = "0.5.0";
 
-if (!AUTH_TOKEN) {
+if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
+  process.exit(1);
+}
+
+// Fail fast if the initial token rotation hits a revoked device or 401.
+try {
+  await getAccessToken();
+} catch (e) {
+  console.error(`[uttero] ${e instanceof Error ? e.message : String(e)}`);
   process.exit(1);
 }
 
@@ -174,7 +186,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     const headers: Record<string, string> = {};
     if (route.method === "POST") headers["Content-Type"] = "application/json";
-    headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
+    headers["Authorization"] = `Bearer ${await getAccessToken()}`;
     headers["X-Bridge-Version"] = BRIDGE_VERSION;
 
     const res = await fetch(`${API_BASE}${route.path}`, {
@@ -251,7 +263,7 @@ async function connectCallSSE(callId: string) {
   while (!controller.signal.aborted) {
     try {
       const headers: Record<string, string> = {};
-      headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
+      headers['Authorization'] = `Bearer ${await getAccessToken()}`;
 
       const res = await fetch(`${API_BASE}/api/events/${callId}`, {
         headers,
@@ -345,7 +357,7 @@ async function registerAgent(): Promise<string> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${AUTH_TOKEN}`,
+      Authorization: `Bearer ${await getAccessToken()}`,
     },
     body: JSON.stringify({ name, description: desc, hostname: host }),
   });
@@ -371,7 +383,7 @@ function startHeartbeat(agentId: string) {
     try {
       await fetch(`${API_BASE}/api/agents/${agentId}/heartbeat`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${AUTH_TOKEN}` },
+        headers: { Authorization: `Bearer ${await getAccessToken()}` },
       });
     } catch (err: any) {
       console.error(`[uttero] Heartbeat failed: ${err.message}`);
@@ -387,7 +399,7 @@ let SUPERSEDED = false;
 async function connectAgentStream(agentId: string) {
   while (!SUPERSEDED) {
     try {
-      const res = await fetch(`${API_BASE}/api/stream/agent/${agentId}?token=${AUTH_TOKEN}`);
+      const res = await fetch(`${API_BASE}/api/stream/agent/${agentId}?token=${await getAccessToken()}`);
       if (!res.ok || !res.body) {
         throw new Error(`Agent stream failed: ${res.status}`);
       }
