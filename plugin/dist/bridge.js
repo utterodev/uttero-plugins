@@ -14479,8 +14479,8 @@ function getCredentials() {
     return null;
   try {
     const data = JSON.parse(readFileSync(CREDENTIALS_FILE, "utf-8"));
-    if (new Date(data.expires_at) < new Date) {
-      console.error("Token expired. Run `/uttero:configure` or `npx uttero login` to re-authenticate.");
+    if (!data.access_token || !data.refresh_token) {
+      console.error("[uttero] Credentials format has changed for the new pair flow. " + "Please run /uttero:configure to re-pair this device.");
       return null;
     }
     return data;
@@ -14489,15 +14489,95 @@ function getCredentials() {
   }
 }
 
+// bin/lib/credentials.ts
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, writeFileSync as writeFileSync2, unlinkSync as unlinkSync2, chmodSync as chmodSync2 } from "fs";
+import { join as join2 } from "path";
+import { homedir as homedir2 } from "os";
+var UTTERO_DIR2 = join2(homedir2(), ".uttero");
+var CREDENTIALS_FILE2 = join2(UTTERO_DIR2, "credentials.json");
+function getCredentials2() {
+  if (!existsSync2(CREDENTIALS_FILE2))
+    return null;
+  try {
+    const data = JSON.parse(readFileSync2(CREDENTIALS_FILE2, "utf-8"));
+    if (!data.access_token || !data.refresh_token) {
+      console.error("[uttero] Credentials format has changed for the new pair flow. " + "Please run /uttero:configure to re-pair this device.");
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+function saveCredentials(cred) {
+  if (!existsSync2(UTTERO_DIR2)) {
+    mkdirSync2(UTTERO_DIR2, { recursive: true });
+  }
+  writeFileSync2(CREDENTIALS_FILE2, JSON.stringify(cred, null, 2));
+  chmodSync2(CREDENTIALS_FILE2, 384);
+}
+
+// bin/lib/auth.ts
+var REFRESH_AHEAD_MS = 5 * 60 * 1000;
+var inFlight = null;
+async function postRefresh(serverUrl, refreshToken) {
+  const res = await fetch(`${serverUrl}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+  if (res.status === 401) {
+    throw new Error("[uttero] Refresh token was rejected. This device may have been revoked. " + "Run /uttero:configure to re-pair.");
+  }
+  if (!res.ok) {
+    throw new Error(`[uttero] /api/auth/refresh returned HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+async function doRefresh(current) {
+  const result = await postRefresh(current.server_url, current.refresh_token);
+  const expiresAt = new Date(Date.now() + result.access_expires_in * 1000).toISOString();
+  const next = {
+    ...current,
+    access_token: result.access_token,
+    refresh_token: result.refresh_token,
+    access_expires_at: expiresAt
+  };
+  saveCredentials(next);
+  return next.access_token;
+}
+async function getAccessToken() {
+  const cred = getCredentials2();
+  if (!cred) {
+    throw new Error("[uttero] No credentials found. Run /uttero:configure to pair this device.");
+  }
+  const expiresAtMs = Date.parse(cred.access_expires_at);
+  const needsRefresh = !Number.isFinite(expiresAtMs) || Date.now() + REFRESH_AHEAD_MS >= expiresAtMs;
+  if (!needsRefresh) {
+    return cred.access_token;
+  }
+  if (!inFlight) {
+    inFlight = doRefresh(cred).finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
+}
+
 // bin/bridge.ts
 var cred = getCredentials();
 var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
-var AUTH_TOKEN = process.env.UTTERO_AUTH_TOKEN ?? cred?.token;
 var AGENT_ID = "";
-var BRIDGE_VERSION = "0.4.0";
-if (!AUTH_TOKEN) {
+var BRIDGE_VERSION = "0.5.0";
+if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
+  process.exit(1);
+}
+try {
+  await getAccessToken();
+} catch (e) {
+  console.error(`[uttero] ${e instanceof Error ? e.message : String(e)}`);
   process.exit(1);
 }
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
@@ -14643,7 +14723,7 @@ mcp.setRequestHandler(CallToolRequestSchema2, async (req) => {
     const headers = {};
     if (route.method === "POST")
       headers["Content-Type"] = "application/json";
-    headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
+    headers["Authorization"] = `Bearer ${await getAccessToken()}`;
     headers["X-Bridge-Version"] = BRIDGE_VERSION;
     const res = await fetch(`${API_BASE}${route.path}`, {
       method: route.method,
@@ -14697,7 +14777,7 @@ async function connectCallSSE(callId) {
   while (!controller.signal.aborted) {
     try {
       const headers = {};
-      headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
+      headers["Authorization"] = `Bearer ${await getAccessToken()}`;
       const res = await fetch(`${API_BASE}/api/events/${callId}`, {
         headers,
         signal: controller.signal
@@ -14776,7 +14856,7 @@ async function registerAgent() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${AUTH_TOKEN}`
+      Authorization: `Bearer ${await getAccessToken()}`
     },
     body: JSON.stringify({ name, description: desc, hostname: host })
   });
@@ -14798,17 +14878,18 @@ function startHeartbeat(agentId) {
     try {
       await fetch(`${API_BASE}/api/agents/${agentId}/heartbeat`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${AUTH_TOKEN}` }
+        headers: { Authorization: `Bearer ${await getAccessToken()}` }
       });
     } catch (err) {
       console.error(`[uttero] Heartbeat failed: ${err.message}`);
     }
   }, 30000);
 }
+var SUPERSEDED = false;
 async function connectAgentStream(agentId) {
-  while (true) {
+  while (!SUPERSEDED) {
     try {
-      const res = await fetch(`${API_BASE}/api/stream/agent/${agentId}?token=${AUTH_TOKEN}`);
+      const res = await fetch(`${API_BASE}/api/stream/agent/${agentId}?token=${await getAccessToken()}`);
       if (!res.ok || !res.body) {
         throw new Error(`Agent stream failed: ${res.status}`);
       }
@@ -14845,6 +14926,13 @@ async function connectAgentStream(agentId) {
                 });
               } else if (currentEvent === "call_ended") {
                 console.error(`[uttero] Call ended: ${parsed.call_id}`);
+              } else if (currentEvent === "superseded") {
+                console.error(`[uttero] This session was superseded by a newer Claude session in the same project. ` + `Voice bridge stopped. Outbound MCP tools (call_user, list_calls, reply, end_call) still work.`);
+                SUPERSEDED = true;
+                try {
+                  reader.cancel();
+                } catch {}
+                return;
               }
             } catch {}
             currentEvent = "";
@@ -14852,6 +14940,8 @@ async function connectAgentStream(agentId) {
         }
       }
     } catch (err) {
+      if (SUPERSEDED)
+        return;
       console.error(`[uttero] Agent stream error: ${err.message}`);
       await new Promise((r) => setTimeout(r, 2000));
     }

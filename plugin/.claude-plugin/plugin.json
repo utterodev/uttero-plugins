@@ -1,7 +1,7 @@
 {
   "name": "uttero",
   "description": "Voice channel for Claude Code — receive and make calls while coding",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": { "name": "Uttero" },
   "homepage": "https://uttero.dev",
   "repository": "https://github.com/utterodev/uttero-plugins",
