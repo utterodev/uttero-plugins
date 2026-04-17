@@ -20,7 +20,7 @@ const API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.
 const APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 let AGENT_ID = ""; // Set after registration
 
-const BRIDGE_VERSION = "0.6.0";
+const BRIDGE_VERSION = "0.7.0";
 
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
@@ -38,7 +38,7 @@ try {
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
 
 const mcp = new Server(
-  { name: "uttero", version: "0.6.0" },
+  { name: "uttero", version: "0.7.0" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },
