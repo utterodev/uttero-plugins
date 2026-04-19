@@ -15,7 +15,6 @@
 /plugin marketplace add utterodev/uttero-plugins
 /plugin install uttero@uttero-plugins
 /uttero:configure        # paste the pair code from app.uttero.dev/settings/devices
-/uttero:setup            # install the MCP server (project or global scope)
 
 # Start Claude Code with the voice channel enabled
 claude --dangerously-load-development-channels server:uttero
