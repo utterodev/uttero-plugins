@@ -23,7 +23,7 @@ Transcription text enters the active Claude Code conversation as `<channel sourc
 
 ## What Uttero stores
 
-Uttero's hosted service (Supabase-backed) stores account data, call metadata, and transcriptions so call history is available in `app.uttero.dev`. Audio handling, retention windows, and subprocessor list are documented at <https://uttero.dev/privacy>.
+Uttero's hosted service stores account data, call metadata, and transcriptions so call history is available in `app.uttero.dev`. Audio handling, retention windows, and subprocessor list are documented at <https://uttero.dev/privacy>.
 
 ## Local storage
 
