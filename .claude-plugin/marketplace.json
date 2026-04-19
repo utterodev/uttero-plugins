@@ -5,13 +5,22 @@
     "email": "hello@uttero.dev"
   },
   "metadata": {
-    "description": "Voice channel for coding agents"
+    "description": "Voice channel for coding agents — receive and make phone calls while coding",
+    "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "uttero",
       "source": "./plugin",
-      "description": "Voice channel for Claude Code — receive and make calls while coding"
+      "description": "Voice channel for Claude Code — receive and make phone calls while coding. Transcribes caller speech into the session, speaks replies via TTS.",
+      "version": "1.0.0",
+      "author": { "name": "Uttero", "email": "hello@uttero.dev" },
+      "homepage": "https://uttero.dev",
+      "repository": "https://github.com/utterodev/uttero-plugins",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["voice", "channel", "calls", "audio", "mcp", "tts", "stt", "phone"],
+      "tags": ["voice", "channel", "tts", "stt", "phone", "calls"]
     }
   ]
 }

@@ -1,12 +1,12 @@
 {
   "name": "uttero",
-  "description": "Voice channel for Claude Code — receive and make calls while coding",
-  "version": "0.8.1",
-  "author": { "name": "Uttero" },
+  "description": "Voice channel for Claude Code — receive and make phone calls while coding",
+  "version": "1.0.0",
+  "author": { "name": "Uttero", "email": "hello@uttero.dev" },
   "homepage": "https://uttero.dev",
   "repository": "https://github.com/utterodev/uttero-plugins",
   "license": "MIT",
-  "keywords": ["voice", "channel", "calls", "audio", "mcp"],
+  "keywords": ["voice", "channel", "calls", "audio", "mcp", "tts", "stt", "phone"],
   "mcpServers": {
     "uttero": {
       "command": "node",
