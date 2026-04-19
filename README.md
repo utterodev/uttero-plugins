@@ -6,9 +6,7 @@
 
 ## Demo
 
-_Drop a 10-20s GIF showing incoming call → transcription → Claude reply at `docs/demo.gif` and reference it here._
-
-![Uttero demo](./docs/demo.gif)
+![Uttero demo](./docs/demo-hd.gif)
 
 ## Quick start
 
@@ -24,14 +22,6 @@ claude --dangerously-load-development-channels server:uttero
 ```
 
 After approval to the official marketplace the last line simplifies to `claude --channels plugin:uttero@uttero-plugins`.
-
-### Cursor / Windsurf
-
-```bash
-npx uttero login
-npx uttero setup
-# Open your agent — the bridge starts automatically
-```
 
 ## How it works
 
@@ -128,7 +118,6 @@ Source of truth is `plugin/bin/bridge.ts`. Auth and credential helpers live in `
 │   ├── commands/               # /uttero:configure, /uttero:setup, /uttero:access
 │   ├── dist/                   # built bridge.js
 │   └── package.json
-├── cli/                        # npm package for Cursor/Windsurf users
 ├── LICENSE                     # MIT
 ├── PRIVACY.md
 ├── README.md
