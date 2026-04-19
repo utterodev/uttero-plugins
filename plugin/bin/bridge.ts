@@ -20,7 +20,7 @@ const API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.
 const APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 let AGENT_ID = ""; // Set after registration
 
-const BRIDGE_VERSION = "0.8.0";
+const BRIDGE_VERSION = "0.8.1";
 
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
@@ -38,7 +38,7 @@ try {
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
 
 const mcp = new Server(
-  { name: "uttero", version: "0.8.0" },
+  { name: "uttero", version: "0.8.1" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },
@@ -48,7 +48,7 @@ const mcp = new Server(
       "YOU ARE THE BRAIN behind OttrVoice calls. You autonomously manage voice conversations — there is no human operator supervising. When users speak to you on a call, YOU decide what to do and reply directly.",
       "",
       'Voice call events arrive as <channel source="ottrvoice" call_id="..." user_id="..." event="...">.',
-      'event="transcription" (prefixed [user]): The user on the call said this. The transcription may include a [quick_reply: ...] tag at the end — this means a brief acknowledgment was ALREADY spoken to the user via TTS. YOU must decide how to respond using the rules below.',
+      'event="transcription" (prefixed [user] for voice, [user typed] for text composer): The user on the call said this. The transcription may include a [quick_reply: ...] tag at the end — this means a brief acknowledgment was ALREADY spoken to the user via TTS. YOU must decide how to respond using the rules below.',
       'event="speaker" (prefixed [speaker]): Something YOU previously said via the reply tool. Normal conversation context.',
       'event="incoming_call": Someone is calling. Accept and greet them.',
       'event="call_ended": The call ended. No action needed.',
@@ -357,7 +357,8 @@ async function connectCallSSE(callId: string) {
 
               let content: string;
               if (currentEvent === "transcription") {
-                content = `[user] ${parsed.text}`;
+                const prefix = parsed.source === "typed" ? "[user typed]" : "[user]";
+                content = `${prefix} ${parsed.text}`;
                 // Reset silence timer on each transcription
                 resetSilenceTimer(parsed.call_id, parsed.user_id ?? "unknown");
               } else if (currentEvent === "speaker") {

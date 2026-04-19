@@ -14569,7 +14569,7 @@ var cred = getCredentials();
 var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 var AGENT_ID = "";
-var BRIDGE_VERSION = "0.8.0";
+var BRIDGE_VERSION = "0.8.1";
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
@@ -14581,7 +14581,7 @@ try {
   process.exit(1);
 }
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
-var mcp = new Server({ name: "uttero", version: "0.8.0" }, {
+var mcp = new Server({ name: "uttero", version: "0.8.1" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
     tools: {}
@@ -14590,7 +14590,7 @@ var mcp = new Server({ name: "uttero", version: "0.8.0" }, {
     "YOU ARE THE BRAIN behind OttrVoice calls. You autonomously manage voice conversations \u2014 there is no human operator supervising. When users speak to you on a call, YOU decide what to do and reply directly.",
     "",
     'Voice call events arrive as <channel source="ottrvoice" call_id="..." user_id="..." event="...">.',
-    'event="transcription" (prefixed [user]): The user on the call said this. The transcription may include a [quick_reply: ...] tag at the end \u2014 this means a brief acknowledgment was ALREADY spoken to the user via TTS. YOU must decide how to respond using the rules below.',
+    'event="transcription" (prefixed [user] for voice, [user typed] for text composer): The user on the call said this. The transcription may include a [quick_reply: ...] tag at the end \u2014 this means a brief acknowledgment was ALREADY spoken to the user via TTS. YOU must decide how to respond using the rules below.',
     'event="speaker" (prefixed [speaker]): Something YOU previously said via the reply tool. Normal conversation context.',
     'event="incoming_call": Someone is calling. Accept and greet them.',
     'event="call_ended": The call ended. No action needed.',
@@ -14862,7 +14862,8 @@ async function connectCallSSE(callId) {
                 meta2.input = String(parsed.source);
               let content;
               if (currentEvent === "transcription") {
-                content = `[user] ${parsed.text}`;
+                const prefix = parsed.source === "typed" ? "[user typed]" : "[user]";
+                content = `${prefix} ${parsed.text}`;
                 resetSilenceTimer(parsed.call_id, parsed.user_id ?? "unknown");
               } else if (currentEvent === "speaker") {
                 content = `[speaker] ${parsed.text}`;
