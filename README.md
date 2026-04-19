@@ -35,16 +35,22 @@ npx uttero setup
 
 ## How it works
 
-```
-  ┌────────────┐         ┌───────────────┐        ┌────────────────────┐
-  │ Caller's   │         │ api.uttero.dev │       │ Your machine       │
-  │ browser    │◀──WebRTC─▶│ (STT + TTS +  │─SSE──▶│ uttero bridge (MCP)│
-  │ or app     │   +audio  │  call routing)│◀──────│                    │
-  └────────────┘         └───────────────┘ bearer │ ┌────────────────┐ │
-                                                   │ │ Claude Code    │ │
-                                                   │ │ session        │ │
-                                                   │ └────────────────┘ │
-                                                   └────────────────────┘
+```mermaid
+flowchart LR
+    caller["Caller<br/>(browser or mobile app)"]
+    api["api.uttero.dev<br/>STT · TTS · call routing"]
+    bridge["uttero bridge<br/>(MCP server)"]
+    claude["Claude Code session"]
+
+    caller <-- "WebRTC audio" --> api
+    api -- "SSE (bearer auth)" --> bridge
+    bridge -- "authenticated HTTPS" --> api
+    bridge <-- "stdio / channel events" --> claude
+
+    subgraph local["Your machine"]
+        bridge
+        claude
+    end
 ```
 
 1. A caller hits your public URL (`app.uttero.dev/call/<id>`) or initiates a call from the mobile client.
