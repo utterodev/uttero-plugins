@@ -14569,7 +14569,7 @@ var cred = getCredentials();
 var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 var AGENT_ID = "";
-var BRIDGE_VERSION = "0.5.0";
+var BRIDGE_VERSION = "0.8.0";
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
@@ -14581,7 +14581,7 @@ try {
   process.exit(1);
 }
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
-var mcp = new Server({ name: "uttero", version: "0.4.0" }, {
+var mcp = new Server({ name: "uttero", version: "0.8.0" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
     tools: {}
@@ -14633,6 +14633,49 @@ var mcp = new Server({ name: "uttero", version: "0.4.0" }, {
     "- Explicit turn-yielding: 'over to you', 'your turn', 'go ahead'",
     "- When triggered, respond immediately without waiting for more input.",
     "",
+    "VOICE EXPRESSIVENESS \u2014 TTS CONTROL (IMPORTANT):",
+    "- VoxCPM2 TTS uses the `tone` field on reply/call_user to control vocal delivery.",
+    "- ALWAYS include a `tone` field in every reply. Without it, the voice sounds flat and robotic.",
+    "",
+    "1) TONE FIELD \u2014 controls overall vocal style, emotion, and delivery:",
+    "- The tone is NOT limited to single words. Use rich, descriptive short phrases that paint how the voice should sound.",
+    "- Think of tone as directing a voice actor: describe the emotion, pacing, energy, and texture.",
+    "",
+    "- SIMPLE tones (single emotion): 'friendly', 'excited', 'calm', 'serious', 'sad', 'urgent', 'whisper'",
+    "- RICH tones (descriptive, much better):",
+    "  \u2022 'warm and casual, like chatting with a friend'",
+    "  \u2022 'speaking fast with bright energy and excitement'",
+    "  \u2022 'calm and steady, low volume, thoughtful pacing'",
+    "  \u2022 'serious and direct, slightly urgent'",
+    "  \u2022 'gentle and encouraging, soft voice'",
+    "  \u2022 'playful and light, with a smile in the voice'",
+    "  \u2022 'confident and clear, like a tech presenter'",
+    "  \u2022 'slow and deliberate, explaining something complex'",
+    "  \u2022 'surprised and impressed, genuine amazement'",
+    "  \u2022 'apologetic and empathetic, slightly softer'",
+    "",
+    "- Match the tone to the content and conversation moment:",
+    "  \u2022 Greeting someone: tone='warm and friendly, welcoming'",
+    "  \u2022 Delivering good results: tone='bright and satisfied, clear delivery'",
+    "  \u2022 Reporting an error: tone='calm but serious, steady pacing'",
+    "  \u2022 Explaining code: tone='clear and patient, moderate pace'",
+    "  \u2022 Joking around: tone='playful, light, with a hint of laughter'",
+    "  \u2022 Progress update: tone='casual, reassuring'",
+    "",
+    "2) NON-VERBAL TAGS \u2014 square brackets INLINE in the text for human-like reactions:",
+    "- Laughs/sighs: [laughing], [sigh]",
+    "- Pauses/thinking: [Uhm], [Shh]",
+    "- Questions: [Question-ah], [Question-ei], [Question-en], [Question-oh]",
+    "- Emotions: [Surprise-wa], [Surprise-yo], [Dissatisfaction-hnn]",
+    "- Insert them naturally within the text, not stacked together.",
+    "- Examples:",
+    "  \u2022 text='Hey! [laughing] That is a pretty creative solution.', tone='warm and amused'",
+    "  \u2022 text='[Uhm] Let me think about that for a second.', tone='thoughtful, slightly slower'",
+    "  \u2022 text='[Surprise-wa] It actually worked on the first try!', tone='genuinely surprised and excited'",
+    "  \u2022 text='Yeah, [sigh] that is a known issue with the API.', tone='calm, slightly resigned'",
+    "- Use sparingly \u2014 one or two per reply max. Overuse sounds unnatural.",
+    "- Use lowercase [laughing] not [Laughter]. Stick to the recommended tags above.",
+    "",
     "BEHAVIOR:",
     "- For actionable requests (look something up, run a command, check status), acknowledge first, then do the work and reply with the result.",
     "- For casual conversation (greetings, thanks, jokes), reply conversationally.",
@@ -14667,7 +14710,7 @@ mcp.setRequestHandler(ListToolsRequestSchema2, async () => ({
         properties: {
           user_id: { type: "string", description: "The user to call" },
           text: { type: "string", description: "Initial message to speak" },
-          tone: { type: "string", description: "Optional emotional tone: happy, sad, urgent, excited, calm, whisper, angry, laughing, serious, friendly" },
+          tone: { type: "string", description: "Voice style/emotion. Use rich descriptive phrases, not just single words. Examples: 'warm and friendly', 'speaking fast with excitement', 'calm and steady, explaining something', 'playful with a smile'. ALWAYS include this field." },
           voice: { type: "string", description: "Optional voice character: alloy (neutral), ash (male warm), ballad (soft), coral (female warm), echo (male clear), sage (female authoritative), shimmer (female bright), verse (male deep). Default: alloy" },
           call_id: { type: "string", description: "Optional custom call ID. If not provided, one is auto-generated." },
           context: { type: "string", description: "1-2 sentences MAX describing the call vibe and purpose. Keep it short. Examples: 'Friendly check-in, be warm and casual', 'Urgent production outage, be direct', 'Contract approval, be professional and patient'" }
@@ -14683,7 +14726,7 @@ mcp.setRequestHandler(ListToolsRequestSchema2, async () => ({
         properties: {
           call_id: { type: "string", description: "The active call ID" },
           text: { type: "string", description: "Message to speak" },
-          tone: { type: "string", description: "Optional emotional tone: happy, sad, urgent, excited, calm, whisper, angry, laughing, serious, friendly" },
+          tone: { type: "string", description: "Voice style/emotion. Use rich descriptive phrases, not just single words. Examples: 'warm and friendly', 'speaking fast with excitement', 'calm and steady, explaining something', 'playful with a smile'. ALWAYS include this field." },
           context: { type: "string", description: "Optional: 5-10 word description of current conversation topic. Helps the middle brain generate aligned filler responses and clean transcription errors. Update when topic shifts." }
         },
         required: ["call_id", "text"]
@@ -14815,6 +14858,8 @@ async function connectCallSSE(callId) {
                 meta2.call_id = parsed.call_id;
               if (parsed.user_id)
                 meta2.user_id = parsed.user_id;
+              if (parsed.source)
+                meta2.input = String(parsed.source);
               let content;
               if (currentEvent === "transcription") {
                 content = `[user] ${parsed.text}`;
