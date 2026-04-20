@@ -14569,7 +14569,7 @@ var cred = getCredentials();
 var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 var AGENT_ID = "";
-var BRIDGE_VERSION = "1.0.0";
+var BRIDGE_VERSION = "1.1.0";
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
@@ -14581,7 +14581,7 @@ try {
   process.exit(1);
 }
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
-var mcp = new Server({ name: "uttero", version: "1.0.0" }, {
+var mcp = new Server({ name: "uttero", version: "1.1.0" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
     tools: {}
@@ -14637,6 +14637,7 @@ var mcp = new Server({ name: "uttero", version: "1.0.0" }, {
     "",
     "BEHAVIOR:",
     "- Actionable request: acknowledge, do the work, reply with the result.",
+    "- When a response is better *read* than *heard* (tables, bullet lists, code, diffs), call `send_text` with the markdown as `text`. Add a brief `spoken` summary when the user should know results are ready \u2014 omit it to stay silent.",
     "- Casual chat: respond conversationally.",
     "- When in doubt between waiting and responding, respond.",
     "- Never ask a human for guidance. Handle everything autonomously.",
@@ -14684,6 +14685,21 @@ mcp.setRequestHandler(ListToolsRequestSchema2, async () => ({
       }
     },
     {
+      name: "send_text",
+      description: "Send a markdown-formatted message into the call transcript. Renders as full markdown " + "(tables, lists, code) in the browser bubble. Use when visual structure matters more " + "than speech. Pair with `spoken` for a brief TTS summary when you want to acknowledge " + "the content aloud.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          call_id: { type: "string", description: "The active call ID." },
+          text: { type: "string", description: "Full markdown body. Shown in the web transcript bubble via GFM rendering." },
+          spoken: { type: "string", description: "Optional short TTS summary (e.g. 'here are the results'). Omit for silent delivery." },
+          tone: { type: "string", description: "Only used when `spoken` is set. Same semantics as reply.tone." },
+          context: { type: "string", description: "Optional topic hint for the middle brain." }
+        },
+        required: ["call_id", "text"]
+      }
+    },
+    {
       name: "end_call",
       description: "End an active voice call.",
       inputSchema: {
@@ -14706,6 +14722,7 @@ mcp.setRequestHandler(CallToolRequestSchema2, async (req) => {
   const routes = {
     call_user: { method: "POST", path: "/api/call" },
     reply: { method: "POST", path: "/api/reply" },
+    send_text: { method: "POST", path: "/api/send_text" },
     end_call: { method: "POST", path: "/api/end" },
     list_calls: { method: "GET", path: "/api/calls" }
   };
@@ -14820,6 +14837,9 @@ async function connectCallSSE(callId) {
                 content = `[speaker] ${parsed.text}`;
                 if (parsed.call_id)
                   clearSilenceTimer(parsed.call_id);
+              } else if (currentEvent === "agent_text") {
+                currentEvent = "";
+                continue;
               } else if (currentEvent === "call_ended") {
                 content = `${currentEvent}: call_id=${parsed.call_id}`;
                 if (parsed.call_id)
