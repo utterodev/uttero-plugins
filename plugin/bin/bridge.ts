@@ -20,7 +20,7 @@ const API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.
 const APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 let AGENT_ID = ""; // Set after registration
 
-const BRIDGE_VERSION = "1.1.0";
+const BRIDGE_VERSION = "1.2.0";
 
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
@@ -38,7 +38,7 @@ try {
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
 
 const mcp = new Server(
-  { name: "uttero", version: "1.1.0" },
+  { name: "uttero", version: "1.2.0" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },
@@ -198,6 +198,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   if (!route) throw new Error(`Unknown tool: ${name}`);
 
   let data: string;
+  let status = 0;
   try {
     const headers: Record<string, string> = {};
     if (route.method === "POST") headers["Content-Type"] = "application/json";
@@ -211,9 +212,23 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         name === "call_user" && AGENT_ID ? { ...args, agent_id: AGENT_ID } : args
       ) : undefined,
     });
+    status = res.status;
     data = await res.text();
   } catch (err: any) {
     return { content: [{ type: "text", text: `Connection error: ${err.message}. API_BASE=${API_BASE}` }] };
+  }
+
+  // Surface trial/quota gating in plain language so Claude Code can relay it cleanly.
+  if (status === 402) {
+    let reason = "blocked";
+    try { reason = JSON.parse(data).reason || JSON.parse(data).source || "blocked"; } catch {}
+    const msg =
+      reason === "trial_expired"
+        ? "Your Uttero free trial has ended. Pick a plan to keep making calls: https://app.uttero.dev/billing"
+        : reason === "daily_limit"
+        ? "Daily call quota reached. Either wait until tomorrow, upgrade your plan, or buy credits: https://app.uttero.dev/billing"
+        : `Voice calls are blocked (${reason}). Manage plan: https://app.uttero.dev/billing`;
+    return { content: [{ type: "text", text: msg }], isError: true };
   }
 
   // For call_user, start per-call SSE and enrich response with session URL

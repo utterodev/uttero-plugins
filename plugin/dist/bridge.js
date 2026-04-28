@@ -14569,7 +14569,7 @@ var cred = getCredentials();
 var API_BASE = process.env.UTTERO_API_URL ?? cred?.server_url ?? "https://api.uttero.dev";
 var APP_BASE = process.env.UTTERO_APP_URL ?? "https://app.uttero.dev";
 var AGENT_ID = "";
-var BRIDGE_VERSION = "1.1.0";
+var BRIDGE_VERSION = "1.2.0";
 if (!cred) {
   console.error("[uttero] Not authenticated. Run `/uttero:configure` or `npx uttero login`.");
   process.exit(1);
@@ -14581,7 +14581,7 @@ try {
   process.exit(1);
 }
 console.error(`[uttero] Bridge v${BRIDGE_VERSION} | API: ${API_BASE}`);
-var mcp = new Server({ name: "uttero", version: "1.1.0" }, {
+var mcp = new Server({ name: "uttero", version: "1.2.0" }, {
   capabilities: {
     experimental: { "claude/channel": {} },
     tools: {}
@@ -14730,6 +14730,7 @@ mcp.setRequestHandler(CallToolRequestSchema2, async (req) => {
   if (!route)
     throw new Error(`Unknown tool: ${name}`);
   let data;
+  let status = 0;
   try {
     const headers = {};
     if (route.method === "POST")
@@ -14741,9 +14742,18 @@ mcp.setRequestHandler(CallToolRequestSchema2, async (req) => {
       headers,
       body: route.method === "POST" ? JSON.stringify(name === "call_user" && AGENT_ID ? { ...args, agent_id: AGENT_ID } : args) : undefined
     });
+    status = res.status;
     data = await res.text();
   } catch (err) {
     return { content: [{ type: "text", text: `Connection error: ${err.message}. API_BASE=${API_BASE}` }] };
+  }
+  if (status === 402) {
+    let reason = "blocked";
+    try {
+      reason = JSON.parse(data).reason || JSON.parse(data).source || "blocked";
+    } catch {}
+    const msg = reason === "trial_expired" ? "Your Uttero free trial has ended. Pick a plan to keep making calls: https://app.uttero.dev/billing" : reason === "daily_limit" ? "Daily call quota reached. Either wait until tomorrow, upgrade your plan, or buy credits: https://app.uttero.dev/billing" : `Voice calls are blocked (${reason}). Manage plan: https://app.uttero.dev/billing`;
+    return { content: [{ type: "text", text: msg }], isError: true };
   }
   if (name === "call_user") {
     try {
